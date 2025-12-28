@@ -1,0 +1,156 @@
+name: RAND_EEF_HOLE_EXPERIMENT
+
+# Where to run commands from
+workdir: .
+
+# Extra env vars to set for the run
+env:
+  # You can optionally add extra PYTHONPATH entries here.
+
+steps:
+
+  # 1) Collect demonstrations (single dataset used for all policies below)
+  - name: collect_demo
+    kind: python_module          # "python -m <module>"
+    module: factoryil.runner
+    args:
+      mode: collect
+      agent: expert
+      task: peg_insert
+      episodes: 300
+      num_envs: 8
+      data_dir: "data/{name}/raw_demo"
+      save_pc: true
+      enable_cameras: true
+      rand_eef: 0.05
+      rand_hole: 0.05
+      timeout_steps: 120
+      discard_timeouts: true
+      headless: true
+
+  # 2) Convert episodes to per-frame NPZ for training
+  - name: convert_to_npz
+    kind: python_module          # "python -m <module>"
+    module: factoryil.tools.convert_to_npz
+    args:
+      episodes_root: "data/{name}/raw_demo/SUCCESS"
+      out_dir: "data/{name}/training_data"
+      pc_num_points: 300
+      pc_random_seed: 0
+      num_workers: 16
+
+  # 3) Train policies
+  - name: train_dp_pc
+    kind: python_module
+    module: imitation_learning.policies.train
+    args:
+      config-name: dp_pc
+      prefix: "{name}_dp_pc"
+      log_dir: "data/{name}/models/dp_pc"
+      data_path: "data/{name}/training_data"
+      training.num_epochs: 300
+
+  - name: train_dp_rgb_cam
+    kind: python_module
+    module: imitation_learning.policies.train
+    args:
+      config-name: dp_rgb_cam
+      prefix: "{name}_dp_rgb_cam"
+      log_dir: "data/{name}/models/dp_rgb_cam"
+      data_path: "data/{name}/training_data"
+      training.num_epochs: 300
+
+  - name: train_b
+    kind: python_module
+    module: imitation_learning.policies.train
+    args:
+      config-name: dp_rgb_cam_tl_tr
+      prefix: "{name}_dp_rgb_cam_tl_tr"
+      log_dir: "data/{name}/models/dp_rgb_cam_tl_tr"
+      data_path: "data/{name}/training_data"
+      training.num_epochs: 300
+
+  - name: train_equibot
+    kind: python_module
+    module: imitation_learning.policies.train
+    args:
+      config-name: equibot
+      prefix: "{name}_equibot"
+      log_dir: "data/{name}/models/equibot"
+      data_path: "data/{name}/training_data"
+      training.num_epochs: 300
+
+  # 4) Inference / test policies (same env randomization as collection)
+  - name: infer_dp_pc
+    kind: python_module
+    module: factoryil.runner
+    args:
+      mode: evaluate
+      agent: il
+      task: peg_insert
+      il_config: dp_pc
+      il_ckpt: "data/{name}/models/dp_pc"
+      episodes: 100
+      num_envs: 8
+      data_dir: "data/{name}/il_infer/dp_pc"
+      save_pc: true
+      enable_cameras: true
+      rand_eef: 0.05
+      rand_hole: 0.05
+      timeout_steps: 110
+      headless: true
+
+  - name: infer_dp_rgb_cam
+    kind: python_module
+    module: factoryil.runner
+    args:
+      mode: evaluate
+      agent: il
+      task: peg_insert
+      il_config: dp_rgb_cam
+      il_ckpt: "data/{name}/models/dp_rgb_cam"
+      episodes: 100
+      num_envs: 8
+      data_dir: "data/{name}/il_infer/dp_rgb_cam"
+      enable_cameras: true
+      rand_eef: 0.05
+      rand_hole: 0.05
+      timeout_steps: 110
+      headless: true
+
+  - name: infer_dp_rgb_cam_tl_tr
+    kind: python_module
+    module: factoryil.runner
+    args:
+      mode: evaluate
+      agent: il
+      task: peg_insert
+      il_config: dp_rgb_cam_tl_tr
+      il_ckpt: "data/{name}/models/dp_rgb_cam_tl_tr"
+      episodes: 100
+      num_envs: 8
+      data_dir: "data/{name}/il_infer/dp_rgb_cam_tl_tr"
+      enable_cameras: true
+      rand_eef: 0.05
+      rand_hole: 0.05
+      timeout_steps: 110
+      headless: true
+
+  - name: infer_equibot
+    kind: python_module
+    module: factoryil.runner
+    args:
+      mode: evaluate
+      agent: il
+      task: peg_insert
+      il_config: equibot
+      il_ckpt: "data/{name}/models/equibot"
+      episodes: 100
+      num_envs: 8
+      data_dir: "data/{name}/il_infer/equibot"
+      save_pc: true
+      enable_cameras: true
+      rand_eef: 0.05
+      rand_hole: 0.05
+      timeout_steps: 110
+      headless: true

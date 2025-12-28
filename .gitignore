@@ -1,0 +1,24 @@
+data/
+exp_data/
+wandb/
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Method (Not released)
+reference_code
+src/third_party/imitation_learning
+toread.md
+temp.txt
+cpfiles.py
+filespaths.txt
+prompt.txt

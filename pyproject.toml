@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "factoryil"
+version = "0.0.1"
+requires-python = ">=3.10"
+# Keep deps minimal here; IsaacSim/IsaacLab environments usually already provide torch, numpy, etc.
+dependencies = ["PyYAML", "Pillow", "imageio"]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+include-package-data = true
+
+[tool.setuptools.packages.find]
+# Search both the main src/ tree and the consolidated vendored packages folder.
+# This keeps imports like `import tacex_assets` working even though the sources
+# live under src/third_party/.
+where = ["src", "src/third_party"]
+# Prevent accidentally installing namespace-style packages like `third_party.tacex`.
+exclude = ["third_party*"]
+
+[tool.setuptools.package-data]
+# Hydra configs for the vendored imitation-learning code.
+"imitation_learning.policies" = ["configs/*.yaml"]
+
+# RL-Games YAML config shipped with the vendored TacEx factory env (optional).
+"tacex_factory_core" = ["agents/*.yaml"]
+
+# TacEx Tasks package includes many per-task agent configs and docs (optional).
+"tacex_tasks" = ["**/*.yaml", "**/*.md"]
