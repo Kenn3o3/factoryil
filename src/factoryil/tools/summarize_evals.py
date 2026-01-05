@@ -1,0 +1,205 @@
+"""Summarize evaluation results into a single Markdown report.
+
+This tool is meant to be run after `factoryil.run_experiment` completes.
+
+It scans an experiment folder (e.g. `data/MAIN_EXPERIMENT_2`) for
+`**/eval_summary.json` files produced by evaluation runs and writes a concise
+Markdown report directly under the experiment folder.
+
+Example:
+    python -m factoryil.tools.summarize_evals \
+        --experiment_dir data/MAIN_EXPERIMENT_2
+
+By default it writes:
+    data/MAIN_EXPERIMENT_2/EVAL_SUMMARY.md
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, Iterable, List, Optional
+
+
+@dataclass(frozen=True)
+class EvalRecord:
+    # Where this eval_summary.json came from.
+    rel_dir: str
+
+    # Core outcomes
+    successes: int
+    failures: int
+    success_rate: float
+    episodes_total: int
+
+    # Helpful metadata
+    task: Optional[str]
+    il_config: Optional[str]
+    il_ckpt: Optional[str]
+    num_envs: Optional[int]
+    timeout_steps: Optional[int]
+    timeout_s: Optional[float]
+
+
+def _safe_float(x: Any) -> Optional[float]:
+    try:
+        return float(x)
+    except Exception:
+        return None
+
+
+def _safe_int(x: Any) -> Optional[int]:
+    try:
+        return int(x)
+    except Exception:
+        return None
+
+
+def _load_record(p: Path, experiment_dir: Path) -> EvalRecord:
+    with p.open("r") as f:
+        obj = json.load(f)
+
+    args = obj.get("args") or {}
+
+    rel_dir = str(p.parent.relative_to(experiment_dir))
+    return EvalRecord(
+        rel_dir=rel_dir,
+        successes=int(obj.get("successes", 0)),
+        failures=int(obj.get("failures", 0)),
+        success_rate=float(obj.get("success_rate", 0.0)),
+        episodes_total=int(obj.get("episodes_total", obj.get("episodes_requested", 0))),
+        task=args.get("task"),
+        il_config=args.get("il_config"),
+        il_ckpt=args.get("il_ckpt"),
+        num_envs=_safe_int(args.get("num_envs")),
+        timeout_steps=_safe_int(args.get("timeout_steps")),
+        timeout_s=_safe_float(args.get("timeout_s")),
+    )
+
+
+def _find_eval_summaries(experiment_dir: Path) -> List[Path]:
+    # Typical location: data/<EXPERIMENT>/il_infer/<config>/eval_summary.json
+    # But we intentionally scan the whole experiment_dir for robustness.
+    return sorted(experiment_dir.rglob("eval_summary.json"))
+
+
+def _format_pct(x: float) -> str:
+    return f"{100.0 * x:.2f}%"
+
+
+def render_markdown(experiment_dir: Path, records: List[EvalRecord]) -> str:
+    experiment_name = experiment_dir.name
+    now = datetime.now().isoformat(timespec="seconds")
+
+    lines: List[str] = []
+    lines.append(f"# Evaluation summary: `{experiment_name}`")
+    lines.append("")
+    lines.append(f"Generated: `{now}`")
+    lines.append("")
+
+    if not records:
+        lines.append("No `eval_summary.json` files were found under this experiment directory.")
+        lines.append("")
+        return "\n".join(lines)
+
+    # Sort by success_rate desc, then successes desc.
+    records_sorted = sorted(records, key=lambda r: (r.success_rate, r.successes), reverse=True)
+
+    # Quick highlight
+    best = records_sorted[0]
+    lines.append("## Best run")
+    lines.append("")
+    lines.append(
+        f"- Location: `{best.rel_dir}`\n"
+        f"- Config: `{best.il_config}`\n"
+        f"- Success rate: **{_format_pct(best.success_rate)}** ({best.successes}/{best.episodes_total})"
+    )
+    if best.il_ckpt:
+        lines.append(f"- Checkpoint: `{best.il_ckpt}`")
+    lines.append("")
+
+    # Table
+    lines.append("## All evaluation results")
+    lines.append("")
+    lines.append(
+        "| run_dir | task | il_config | success_rate | successes | failures | episodes | num_envs | timeout_steps | timeout_s | ckpt |"
+    )
+    lines.append(
+        "|---|---|---|---:|---:|---:|---:|---:|---:|---:|---|"
+    )
+
+    def _cell(x: Optional[Any]) -> str:
+        if x is None:
+            return ""
+        s = str(x)
+        return s.replace("|", "\\|")
+
+    for r in records_sorted:
+        lines.append(
+            "| "
+            + " | ".join(
+                [
+                    f"`{_cell(r.rel_dir)}`",
+                    _cell(r.task),
+                    f"`{_cell(r.il_config)}`" if r.il_config else "",
+                    _format_pct(r.success_rate),
+                    str(r.successes),
+                    str(r.failures),
+                    str(r.episodes_total),
+                    _cell(r.num_envs),
+                    _cell(r.timeout_steps),
+                    _cell(r.timeout_s),
+                    f"`{_cell(r.il_ckpt)}`" if r.il_ckpt else "",
+                ]
+            )
+            + " |"
+        )
+
+    lines.append("")
+    lines.append("## Notes")
+    lines.append("")
+    lines.append("- This report is generated by `factoryil.tools.summarize_evals`.\n"
+                 "- It scans for `eval_summary.json` under the experiment folder recursively.")
+    lines.append("")
+
+    return "\n".join(lines)
+
+
+def main(argv: Optional[Iterable[str]] = None) -> int:
+    p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument(
+        "--experiment_dir",
+        type=str,
+        required=True,
+        help="Experiment directory to scan (e.g. data/MAIN_EXPERIMENT_2)",
+    )
+    p.add_argument(
+        "--out",
+        type=str,
+        default=None,
+        help="Output markdown path. Default: <experiment_dir>/EVAL_SUMMARY.md",
+    )
+    args = p.parse_args(list(argv) if argv is not None else None)
+
+    experiment_dir = Path(args.experiment_dir).expanduser().resolve()
+    if not experiment_dir.exists():
+        raise FileNotFoundError(f"experiment_dir does not exist: {experiment_dir}")
+
+    out_path = Path(args.out).expanduser().resolve() if args.out else (experiment_dir / "EVAL_SUMMARY.md")
+
+    eval_files = _find_eval_summaries(experiment_dir)
+    records = [_load_record(f, experiment_dir) for f in eval_files]
+
+    md = render_markdown(experiment_dir, records)
+    out_path.write_text(md)
+
+    print(f"[summarize_evals] Found {len(records)} eval summaries")
+    print(f"[summarize_evals] Wrote: {out_path}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

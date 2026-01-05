@@ -59,7 +59,7 @@ steps:
       data_path: "data/{name}/training_data"
       training.num_epochs: 300
 
-  - name: train_b
+  - name: train_dp_rgb_cam_tl_tr
     kind: python_module
     module: imitation_learning.policies.train
     args:
@@ -153,3 +153,10 @@ steps:
       rand_hole: 0.05
       timeout_steps: 110
       headless: true
+
+  # 5) Summarize evaluation results across policies
+  - name: summarize_evals
+    kind: python_module
+    module: factoryil.tools.summarize_evals
+    args:
+      experiment_dir: "data/{name}"

@@ -90,7 +90,7 @@ steps:
       task: peg_insert
       il_config: dp_pc
       il_ckpt: "data/{name}/models/dp_pc"
-      episodes: 8
+      episodes: 100
       num_envs: 8
       data_dir: "data/{name}/il_infer/dp_pc"
       save_pc: true
@@ -110,7 +110,7 @@ steps:
       task: peg_insert
       il_config: dp_rgb_cam
       il_ckpt: "data/{name}/models/dp_rgb_cam"
-      episodes: 8
+      episodes: 100
       num_envs: 8
       data_dir: "data/{name}/il_infer/dp_rgb_cam"
       enable_cameras: true
@@ -129,7 +129,7 @@ steps:
       task: peg_insert
       il_config: dp_rgb_cam_tl_tr
       il_ckpt: "data/{name}/models/dp_rgb_cam_tl_tr"
-      episodes: 8
+      episodes: 100
       num_envs: 8
       data_dir: "data/{name}/il_infer/dp_rgb_cam_tl_tr"
       enable_cameras: true
@@ -148,7 +148,7 @@ steps:
       task: peg_insert
       il_config: equibot
       il_ckpt: "data/{name}/models/equibot"
-      episodes: 8
+      episodes: 100
       num_envs: 8
       data_dir: "data/{name}/il_infer/equibot"
       save_pc: true
@@ -158,3 +158,10 @@ steps:
       rand_peg: 0.005
       timeout_steps: 110
       headless: true
+
+  # 5) Summarize evaluation results across policies
+  - name: summarize_evals
+    kind: python_module
+    module: factoryil.tools.summarize_evals
+    args:
+      experiment_dir: "data/{name}"

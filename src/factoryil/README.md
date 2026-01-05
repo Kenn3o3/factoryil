@@ -9,16 +9,6 @@ This package contains:
 
 Policies are trained/inferred directly in the simulator’s conventions (world/env frames).
 
-### Quickstart
-
-Make sure you installed the repo (from the repo root):
-
-```bash
-pip install -e .
-# For training the vendored IL policies:
-pip install -e '.[il]'
-```
-
 - **Teleoperate a task**
 
 ```bash

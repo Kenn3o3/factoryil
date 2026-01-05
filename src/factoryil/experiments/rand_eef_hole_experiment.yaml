@@ -154,3 +154,10 @@ steps:
       rand_hole: 0.05
       timeout_steps: 110
       headless: true
+
+  # 5) Summarize evaluation results across policies
+  - name: summarize_evals
+    kind: python_module
+    module: factoryil.tools.summarize_evals
+    args:
+      experiment_dir: "data/{name}"
