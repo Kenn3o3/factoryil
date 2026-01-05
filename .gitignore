@@ -22,8 +22,5 @@ cpfiles.py
 filespaths.txt
 prompt.txt
 
-# Results
+# data
 data/
-!/data/
-!/data/*/
-!/data/*/EVAL_SUMMARY.md

@@ -10,8 +10,8 @@ Example:
     python -m factoryil.tools.summarize_evals \
         --experiment_dir data/MAIN_EXPERIMENT_2
 
-By default it writes:
-    data/MAIN_EXPERIMENT_2/EVAL_SUMMARY.md
+By default it writes a repo-local report (safe even if `data/` is a symlink):
+    reports/MAIN_EXPERIMENT_2_EVAL_SUMMARY.md
 """
 
 from __future__ import annotations
@@ -180,7 +180,10 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
         "--out",
         type=str,
         default=None,
-        help="Output markdown path. Default: <experiment_dir>/EVAL_SUMMARY.md",
+        help=(
+            "Output markdown path. Default: reports/<experiment_name>_EVAL_SUMMARY.md "
+            "(relative to the current working directory)."
+        ),
     )
     args = p.parse_args(list(argv) if argv is not None else None)
 
@@ -188,7 +191,14 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
     if not experiment_dir.exists():
         raise FileNotFoundError(f"experiment_dir does not exist: {experiment_dir}")
 
-    out_path = Path(args.out).expanduser().resolve() if args.out else (experiment_dir / "EVAL_SUMMARY.md")
+    if args.out:
+        out_path = Path(args.out).expanduser().resolve()
+    else:
+        # Write outside experiment_dir by default so this works even when
+        # experiment_dir lives under a symlinked `data/` folder.
+        out_path = (Path.cwd() / "reports" / f"{experiment_dir.name}_EVAL_SUMMARY.md").resolve()
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
 
     eval_files = _find_eval_summaries(experiment_dir)
     records = [_load_record(f, experiment_dir) for f in eval_files]
