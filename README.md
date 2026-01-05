@@ -148,14 +148,11 @@ cd /path/to/factoryil
 pip install -e .
 ```
 
-
-
-
 ## Experiments
 
 Experiment YAMLs live in `src/factoryil/experiments/`.
 
 ```bash
 # From the repo root:
-python -m factoryil.run_experiment src/factoryil/experiments/overfit_experiment.yaml
+python -m factoryil.run_experiment experiments/overfit_experiment.yaml
 ```
