@@ -35,10 +35,10 @@ Recommended launch style is via the IsaacLab wrapper:
 conda activate env_isaaclab
 cd /path/to/factoryil
 
-# Expert demo collection (add --headless for headless run)
+# Expert demo collection (add --headless for headless run) (Currently only support peg insertion)
 python -m factoryil.runner \
   --agent expert \
-  --task peg_insert \
+  --task peg_insert \ 
   --episodes 10 \
   --num_envs 10 \
   --timeout_steps 110 --discard_timeouts \
@@ -83,70 +83,7 @@ Each `episodeXX/` contains `timestamps_robot.csv` and modality folders like `rgb
 
 The dataset root (i.e., your `--data_dir`) also stores **`camera_params.json`** with the camera intrinsics/extrinsics + env origins from the collection run. Offline tools like `factoryil.tools.episode_to_video` will auto-discover this file to project the EEF marker correctly.
 
-### Replay a saved episode
-
-You have two options:
-
-1) **Replay inside the unified runner** (also logs a new episode):
-
-```bash
-python -m factoryil.runner \
-  --agent replay \
-  --task peg_insert \
-  --episodes 1 \
-  --num_envs 1 \
-  --timeout_s 3.0 \
-  --episode_dir ./data/debug_expert/episode00 \
-  --device cuda:0 --headless --enable_cameras
-```
-
-2) **Replay-only script** (does not save new data): `factoryil.replay_actions`
-
-```bash
-python -m factoryil.replay_actions \
-  --episode_dir ./data/debug_expert/episode00 \
-  --timeout_s 3.0 \
-  --device cuda:0 --headless --enable_cameras
-```
-
 ---
-
-## Debugging helpers
-
-### Segmentation / pointcloud debug dumps
-
-In `factoryil.utils.data.vision`, you can enable debug dumps for env-0:
-
-```bash
-export VT_DEBUG_SEG=1
-export VT_DEBUG_DIR=/tmp/vt_debug   # optional (defaults to ./vt_debug)
-```
-
----
-
-## Troubleshooting
-
-### `ModuleNotFoundError: torch`
-You are not in your Isaac Lab environment. Run:
-
-```bash
-conda activate env_isaaclab
-```
-
-### `ModuleNotFoundError: cv2` or `matplotlib`
-Install tactile runtime deps:
-
-```bash
-pip install opencv-python matplotlib
-```
-
-### `import tacex_assets` fails
-Make sure you installed this repo in editable mode:
-
-```bash
-cd /path/to/factoryil
-pip install -e .
-```
 
 ## Experiments
 
@@ -156,3 +93,14 @@ Experiment YAMLs live in `src/factoryil/experiments/`.
 # From the repo root:
 python -m factoryil.run_experiment experiments/overfit_experiment.yaml
 ```
+
+
+# TODO
+
+- Implement Method []
+- Method Initial Evaluation []
+- Set Seed []
+- Full Experiment Runs []
+- Explore expert for the two other tasks []
+- Add data collection for teleoperation []
+- Pipeline for the two other tasks []
