@@ -85,3 +85,19 @@ This runs **collect → convert → train (DP_PC + DP_RGB) → infer**:
 ```bash
 python -m factoryil.run_experiment src/factoryil/experiments/overfit_experiment.yaml
 ```
+
+### Parallel steps (optional)
+
+For independent steps (e.g., training multiple policies), experiment YAMLs can include a `parallel:` block:
+
+```yaml
+steps:
+  - name: train_policies
+    parallel:
+      - name: train_dp_pc
+        ...
+      - name: train_dp_rgb_cam
+        ...
+```
+
+Parallel children write logs to `data/<experiment_name>/logs/` so their outputs don’t interleave in the terminal.

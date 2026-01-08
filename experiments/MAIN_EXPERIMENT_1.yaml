@@ -48,6 +48,7 @@ steps:
       log_dir: "data/{name}/models/dp_pc"
       data_path: "data/{name}/training_data"
       training.num_epochs: 300
+      training.batch_size: 64
 
   - name: train_dp_rgb_cam
     kind: python_module
@@ -57,7 +58,8 @@ steps:
       prefix: "{name}_dp_rgb_cam"
       log_dir: "data/{name}/models/dp_rgb_cam"
       data_path: "data/{name}/training_data"
-      training.num_epochs: 300
+      training.num_epochs: 300  
+      training.batch_size: 258 # 24 --> 4100MiB 53.26s, 258 --> 40s
 
   - name: train_dp_rgb_cam_tl_tr
     kind: python_module
@@ -68,6 +70,7 @@ steps:
       log_dir: "data/{name}/models/dp_rgb_cam_tl_tr"
       data_path: "data/{name}/training_data"
       training.num_epochs: 300
+      training.batch_size: 156 # 21000
 
   - name: train_equibot
     kind: python_module
@@ -78,6 +81,7 @@ steps:
       log_dir: "data/{name}/models/equibot"
       data_path: "data/{name}/training_data"
       training.num_epochs: 300
+      training.batch_size: 32
 
   # 4) Inference / test policies (same env randomization as collection)
   - name: infer_dp_pc

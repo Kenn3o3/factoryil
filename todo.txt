@@ -1,0 +1,38 @@
+---
+In Lab
+---
+Todo:
+
+(MOST IMPORTANT)
+reduce the iteration time (mainly on training and inferencing) 
+Allow parallel training multiple model by configuring the yaml file. E.g., ...
+test need how much demo (start from training with 50 demos), need to take one day, meanwhile record all the time taken in a log (For data collection, data convert, training each model, inferencing each model), can just record the date time before and after running each task in yaml file and then do the calculation
+validate the current checkpoint saving logic makes sense.
+set up on real franka robot
+validate compliance (ask postdoc), teleoperation setup (including control), change gripper
+Ask if can add a rtx gpu in the H800 server like rtx 5090/4090 and how much cost --> can speed up at least 3 times.
+
+(TASKS)
+demo for audio to text (trigger word -> the next sentence spoken by the same guy)
+Filter 100 papers for survey
+---
+
+Leave earlier and work on TMECH 
+
+Record how long it take for each inference for each model
+===
+
+Training time + Memory required for each policy:
+- dp_pc 2500MiB 64 batch size 300 epochs 1 hour
+- dp_rgb_cam 7000MiB 64 batch size 300 epochs 4 hours
+- train_dp_rgb_cam_tl_tr 13000MiB 64 batch size 300 epochs 9 hours
+- equibot 22000MiB 32 batch size 300 epochs 40 hours
+Inference time (for each inference timestep) + memory for each policy: 
+- 8 envs dp_pc 9000MiB inference time = 3.7 seconds
+- 1 envs dp_pc 8000MiB inference time = 0.5 seconds
+- 8 envs dp_rgb_cam 9500MiB inference time = 3.7 seconds
+- 1 envs dp_rgb_cam 9500MiB inference time = 0.5 seconds
+- 8 envs infer_dp_rgb_cam_tl_tr 12000MiB inference time = 3.5 seconds
+- 1 envs infer_dp_rgb_cam_tl_tr 12000MiB inference time = 0.5 seconds
+- 8 envs infer_equibot 12000MiB inference time = 10 seconds
+- 1 envs infer_equibot 10000MiB inference time = 1.5 seconds

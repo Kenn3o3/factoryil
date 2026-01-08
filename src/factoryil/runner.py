@@ -25,6 +25,7 @@ from typing import Tuple
 from isaaclab.app import AppLauncher
 
 from factoryil import config as C
+from factoryil.utils.seed import FACTORYIL_FIXED_SEED, seed_everything
 from factoryil.episode_manager import (
     EpisodeStager,
     success_mask,
@@ -36,6 +37,8 @@ from factoryil.utils.data.vision import get_object_pointclouds
 from factoryil.cli import build_factoryil_runner_parser
 from factoryil.agents.expert_agents import ExpertAgent
 from factoryil.agents.replay_agents import ReplayAgent
+
+import time
 
 # -----------------------------------------------------------------------------#
 # DEBUG helpers (easy to remove): write EEF pose traces + a quick PNG plot.    #
@@ -177,7 +180,6 @@ def _write_eef_debug_artifacts(episode_dir: str) -> None:
         # If PIL isn't available or something goes wrong, skip silently.
         pass
 
-
 def _tensor_like_to_list(x):
     """Convert torch tensors / numpy arrays / lists to plain python lists."""
     try:
@@ -194,7 +196,6 @@ def _tensor_like_to_list(x):
         pass
     return x
 
-
 def _to_jsonable(x):
     """Best-effort convert arbitrary objects into JSON-serializable values."""
     try:
@@ -202,7 +203,6 @@ def _to_jsonable(x):
         return x
     except Exception:
         return str(x)
-
 
 def _args_to_json_dict(args) -> dict:
     """Convert argparse Namespace to a JSON-serializable dict."""
@@ -215,7 +215,6 @@ def _args_to_json_dict(args) -> dict:
         out[str(k)] = _to_jsonable(v)
     return out
 
-
 def _atomic_json_dump(path: str, payload: dict) -> None:
     """Write JSON atomically to avoid partial files if the process is killed."""
     os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -223,7 +222,6 @@ def _atomic_json_dump(path: str, payload: dict) -> None:
     with open(tmp_path, "w", encoding="utf-8") as f:
         json.dump(payload, f, indent=2, sort_keys=False)
     os.replace(tmp_path, path)
-
 
 def _maybe_write_camera_params_json(env, data_root: str, failed_root: str) -> None:
     """
@@ -381,7 +379,7 @@ def _run_peg_insert_with_agent(args, env, agent) -> dict | None:
             return episodes_ended < target_episodes
         # collect: once we have enough successes, stop saving anything else
         return total_success < target_episodes
-
+    tt0 = time.time()
     while not _should_stop():
         batch_idx += 1
         if mode == "collect":
@@ -400,7 +398,12 @@ def _run_peg_insert_with_agent(args, env, agent) -> dict | None:
         # ------------------------------------------------------------------ #
         # 1) Episode start: reset buffers.                                   #
         # ------------------------------------------------------------------ #
-        raw_obs, _ = env.reset(seed=None)
+        # Re-seed at the start of each batch so that reset-time randomization
+        # (which uses torch.rand internally) is deterministic across runs, and
+        # so IL policy sampling (diffusion) is deterministic per batch.
+        batch_seed = int(FACTORYIL_FIXED_SEED + batch_idx)
+        seed_everything(batch_seed, deterministic=True)
+        raw_obs, _ = env.reset(seed=batch_seed)
         if not wrote_cam_params:
             # Persist camera params once per dataset root for offline video tooling.
             _maybe_write_camera_params_json(
@@ -560,8 +563,13 @@ def _run_peg_insert_with_agent(args, env, agent) -> dict | None:
                 obs_batch.append(obs_i)
 
             done_mask_np = env_done.detach().to("cpu").numpy().astype(bool)
+            
+            # t0 = time.time()
             actions = agent.act(obs_batch, done_mask_np, env, t_step=step_idx)
-
+            # t1 = time.time()
+            # time_used = t1 - t0
+            # print(f"Execution time: {time_used} seconds")
+            
             # ------------------------------------------------------------------
             # 4) Logging at time t.                                            #
             # ------------------------------------------------------------------
@@ -774,10 +782,11 @@ def _run_peg_insert_with_agent(args, env, agent) -> dict | None:
         for i in range(num_envs):
             if not bool(env_done[i].item()):
                 stagers[i].discard()
-
+        tt1 = time.time()
+        tt_time_used = tt1 - tt0
     print(
         f"[FACTORYIL DONE] mode={mode} successes_saved={total_success} "
-        f"episodes_ended={episodes_ended} | out={dataset_root}",
+        f"episodes_ended={episodes_ended} | out={dataset_root}, time used={tt_time_used}",
         flush=True,
     )
     if mode == "evaluate":
@@ -881,6 +890,10 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    # Hardcoded deterministic seed for the entire runner process.
+    # We also re-apply a derived seed per episode-batch during env.reset.
+    seed_everything(FACTORYIL_FIXED_SEED, deterministic=True)
+
     args = parse_args()
 
     # Launch Isaac Sim / Isaac Lab.

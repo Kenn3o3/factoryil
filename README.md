@@ -87,13 +87,36 @@ The dataset root (i.e., your `--data_dir`) also stores **`camera_params.json`** 
 
 ## Experiments
 
-Experiment YAMLs live in `src/factoryil/experiments/`.
+Experiment YAMLs live in `experiments/`.
 
 ```bash
 # From the repo root:
 python -m factoryil.run_experiment experiments/overfit_experiment.yaml
 ```
 
+### Parallel steps
+
+`factoryil.run_experiment` supports running *independent* steps in parallel via a `parallel:` step-group:
+
+```yaml
+steps:
+  - name: A
+    ...
+  - name: B
+    ...
+  - name: my_parallel_block
+    parallel:
+      - name: C
+        ...
+      - name: D
+        ...
+```
+
+This executes: **A → B → (C and D in parallel)**.
+
+Notes:
+- Parallel child processes write stdout/stderr to per-step logs under `data/<experiment_name>/logs/`.
+- The `timelog` includes entries for both the group step and each child (step indices like `3.1`, `3.2`, ...).
 
 # TODO
 
