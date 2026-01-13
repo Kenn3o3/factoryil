@@ -19,7 +19,8 @@ Follow https://github.com/DH-Ng/TacEx
 ### 2) Install FactoryIL
 
 ```bash
-cd /path/to/factoryil
+git clone --recursive https://github.com/Kenn3o3/factoryil.git
+cd factoryil
 conda activate env_isaaclab
 pip install -e .
 ```
