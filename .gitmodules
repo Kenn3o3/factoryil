@@ -1,0 +1,6 @@
+[submodule "src/third_party/pyorbbecsdk"]
+	path = src/third_party/pyorbbecsdk
+	url = https://github.com/orbbec/pyorbbecsdk.git
+[submodule "src/third_party/gsrobotics"]
+	path = src/third_party/gsrobotics
+	url = https://github.com/gelsightinc/gsrobotics.git
