@@ -1,0 +1,85 @@
+# equibot.yaml
+data_path: null
+device: cuda
+
+defaults:
+  - base
+
+prefix: equibot
+use_wandb: true  # set true if you want W&B
+mode: train
+
+agent:
+  agent_name: equibot
+
+env:
+  # A valid name is required but we won't evaluate during training
+  env_class: fold
+  num_eef: 1
+  dof: 7           # CHANGED: action is [pos3, delta_rx, delta_ry, delta_rz, g]
+  eef_dim: 10       # CHANGED: eef_pos is [pos3, dir1(3), dir2(3), g]
+  vectorize: false
+  args:
+    num_eef: ${env.num_eef}
+    dof: ${env.dof}
+    seed: ${seed}
+    obs_mode: "pc"    # use point clouds
+    ac_mode: "rel"    # absolute mode aligns with the centering/scale below
+    max_episode_length: 50
+    num_points: ${data.dataset.num_points}
+    randomize_rotation: false
+    randomize_scale: false
+    uniform_scaling: false
+
+data:
+  dataset_class: base_dataset
+  dataset:
+    path: ${data_path}
+    num_points: 4096
+    num_workers: 8
+    dof: ${env.dof}
+    num_eef: ${env.num_eef}
+    eef_dim: ${env.eef_dim}
+    obs_horizon: ${model.obs_horizon}
+    pred_horizon: ${model.pred_horizon}
+    reduce_horizon_dim: false
+    shuffle_pc: true
+    min_demo_length: 20
+    episode_names: []
+model:
+  hidden_dim: 64
+  obs_horizon: 2
+  ac_horizon: 2
+  pred_horizon: 4
+  obs_mode: ${env.args.obs_mode}
+  ac_mode: ${env.args.ac_mode}
+  # 对 FactoryIL，我们只需要在观测侧使用 SIM(3) 编码，动作保持在环境 SE(3) 坐标系中建模，
+  # 因此关闭基于 center/scale 的局部动作坐标（避免与数据集中“相对 delta 动作”产生不匹配）。
+  # use_local_action_frame: false
+  use_torch_compile: false
+  noise_scheduler:
+    _target_: diffusers.schedulers.scheduling_ddpm.DDPMScheduler
+    num_train_timesteps: 100
+    beta_schedule: squaredcos_cap_v2
+    clip_sample: true
+    prediction_type: epsilon
+  encoder:
+    c_dim: ${model.hidden_dim}
+    backbone_type: vn_pointnet
+    backbone_args:
+      h_dim: ${model.hidden_dim}
+      c_dim: ${model.encoder.c_dim}
+      num_layers: 4
+      knn: 8
+
+training:
+  train_test_split: 0.8
+  batch_size: 32 #22
+  lr: 3e-5
+  weight_decay: 1e-6
+  save_interval: 50
+  ckpt: null
+
+hydra:
+  run:
+    dir: ${log_dir}/${now:%Y%m%d_%H%M}_${prefix}

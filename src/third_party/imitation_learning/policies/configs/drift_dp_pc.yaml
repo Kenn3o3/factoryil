@@ -1,0 +1,101 @@
+data_path: null
+device: cuda
+
+defaults:
+  - base
+
+prefix: drift_dp_pc
+use_wandb: true
+mode: train
+
+agent:
+  agent_name: drift_dp
+
+env:
+  # A valid name is required but we won't evaluate during training
+  num_eef: 1
+  dof: 7
+  eef_dim: 10
+  args:
+    num_eef: ${env.num_eef}
+    dof: ${env.dof}
+    seed: ${seed}
+    obs_mode: "pc"
+    ac_mode: "abs"
+    max_episode_length: 50
+    num_points: ${data.dataset.num_points}
+
+data:
+  dataset_class: base_dataset
+  dataset:
+    path: ${data_path}
+    obs_mode: ${model.obs_mode}
+    obs_horizon: ${model.obs_horizon}
+    pred_horizon: ${model.pred_horizon}
+    reduce_horizon_dim: false
+    min_demo_length: 20
+    dof: 10
+    num_eef: 1
+    eef_dim: 10
+    num_points: 300
+    shuffle_pc: true
+    num_workers: 8
+    rgb_key: rgb_zed
+    precache: true
+    episode_names:
+
+model:
+  hidden_dim: 64
+  obs_horizon: 2
+  ac_horizon: 2
+  pred_horizon: 4
+  obs_mode: pc
+  ac_mode: ${env.args.ac_mode}
+  use_torch_compile: false
+  rgb_input_size: [224, 224]
+  noise_scheduler:
+    _target_: diffusers.schedulers.scheduling_ddpm.DDPMScheduler
+    num_train_timesteps: 100
+    beta_schedule: squaredcos_cap_v2
+    clip_sample: true
+    prediction_type: epsilon
+  encoder:
+    c_dim: ${model.hidden_dim}
+    backbone_type: vn_pointnet
+    backbone_args:
+      h_dim: ${model.hidden_dim}
+      c_dim: ${model.encoder.c_dim}
+      num_layers: 4
+      knn: 8
+  # RFM-specific architecture knobs
+  rfm_hidden_dim: 256
+  rfm_time_emb_dim: 64
+  rfm_feat_dim: 128
+
+training:
+  train_test_split: 0.8
+  batch_size: 64
+  lr: 3e-5
+  weight_decay: 1e-6
+  save_interval: 50
+  # Legacy num_epochs (used only when modules=[coarse] or [rfm]).
+  num_epochs: 1
+  # DRIFT-DP specific:
+  modules: "coarse,rfm"   # allowed: "coarse", "rfm", "coarse,rfm"
+  num_epochs_coarse: 100
+  num_epochs_rfm: 50
+  coarse_ckpt:
+  rfm_ckpt:
+  phase3:
+    enabled: false
+    num_epochs: 0
+    lr_mult_coarse: 0.1
+    lr_mult_rfm: 1.0
+    use_total_loss: true
+    lambda_rfm: 1.0
+
+hydra:
+  run:
+    dir: ${log_dir}/${now:%Y%m%d_%H%M}_${prefix}
+
+

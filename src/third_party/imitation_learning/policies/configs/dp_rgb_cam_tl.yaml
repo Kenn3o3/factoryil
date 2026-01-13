@@ -1,0 +1,81 @@
+# dp_rgb_cam_tl.yaml
+data_path: null
+device: cuda
+
+defaults:
+  - base
+
+prefix: dp_rgb_cam_tl
+use_wandb: true  # set true if you want W&B
+mode: train
+
+agent:
+  agent_name: dp
+
+env:
+  # A valid name is required but we won't evaluate during training
+  num_eef: 1
+  dof: 7
+  eef_dim: 10
+  args:
+    num_eef: ${env.num_eef}
+    dof: ${env.dof}
+    seed: ${seed}
+    obs_mode: "rgb"    # use point clouds
+    ac_mode: "abs"    # you can keep this; DP does not branch on ac_mode
+    max_episode_length: 50  # unused in train, but required in schema
+    num_points: ${data.dataset.num_points}
+
+data:
+  dataset_class: base_dataset
+  dataset:
+    path: ${data_path}         # we’ll pass at runtime via CLI
+    obs_mode: ${model.obs_mode}
+    obs_horizon: ${model.obs_horizon}
+    pred_horizon: ${model.pred_horizon}
+    reduce_horizon_dim: false
+    min_demo_length: 20        # ensure long enough demos for your pred_horizon
+    dof: 7
+    num_eef: 1
+    eef_dim: 7
+    num_points: 4096           # training sample per frame; loader downsamples from stored pc
+    shuffle_pc: true
+    num_workers: 8
+    rgb_keys: ["rgb_cam", "rgb_tactile_left"]
+    episode_names: []
+model:
+  hidden_dim: 64
+  obs_horizon: 2
+  ac_horizon: 2
+  pred_horizon: 4
+  obs_mode: rgb    # pc or rgb
+  ac_mode: ${env.args.ac_mode}
+  use_torch_compile: false
+  rgb_input_size: [224, 224]  # optional; helps with memory/speed
+  noise_scheduler:
+    _target_: diffusers.schedulers.scheduling_ddpm.DDPMScheduler
+    num_train_timesteps: 100
+    beta_schedule: squaredcos_cap_v2
+    clip_sample: true
+    prediction_type: epsilon
+  encoder:
+    c_dim: ${model.hidden_dim}
+    backbone_type: vn_pointnet
+    backbone_args:
+      h_dim: ${model.hidden_dim}
+      c_dim: ${model.encoder.c_dim}
+      num_layers: 4
+      knn: 8
+
+training:
+  train_test_split: 0.8
+  batch_size: 64
+  lr: 3e-5
+  weight_decay: 1e-6
+  save_interval: 50
+  ckpt: null
+
+hydra:
+  run:
+    dir: ${log_dir}/${now:%Y%m%d_%H%M}_${prefix}
+
