@@ -1,0 +1,242 @@
+/*
+Franka fingertip adapter for GelSight Mini
+*/
+
+$fn = 80;
+eps = 0.01;
+
+// =====================
+// NEW PARAMETERS
+// =====================
+drop_z = 17.0;   // How many mm to move the window section down
+split_y = 38.0;  // Y-position where the step occurs (between pocket and tail)
+
+// =====================
+// BRIDGE / GUSSET PARAMS
+// =====================
+bridge_enable   = true;
+
+// If true: two side ribs (recommended). If false: full-width gusset.
+bridge_ribs     = true;
+
+// Rib width in X (each side)
+bridge_rib_w    = 7.5;
+
+// How far the bridge extends into the lowered (front) section in +Y direction.
+// Keep small to avoid reaching into the GelSight relief region.
+bridge_front_y  = 4.5;
+
+// How far the bridge extends under the tail (back) section (bigger = gentler slope/stronger).
+bridge_back_y   = 23.0;
+
+// How far the bridge “keys” into the tail above z=0 (guarantees overlap)
+bridge_attach_z = 4.5;
+
+// =====================
+// A) Overall adapter
+// =====================
+body_w = 30.0;   // X_total
+body_l = 62.0;   // Y_total
+body_h = 17.0;   // Z_total
+
+// =====================
+// B) GelSight pocket
+// =====================
+// Main pocket (for 31 x 24.5 body)
+gs_body_w       = 24.9;  // 24.5 + 0.4
+gs_body_l       = 31.4;  // 31.0 + 0.4
+gs_embed_depth  = 9.0;   // how much of case is captured in Z
+gs_front_margin = 1.0;   // pocket starts at Y=1.0
+
+// Top relief (for 32 mm outer length near top)
+gs_relief_l     = 32.4;  // 32.0 + 0.4
+gs_relief_depth = 1.0;
+
+// Derived
+gs_floor_z  = body_h - gs_embed_depth;          // pocket bottom plane Z
+gs_center_y = gs_front_margin + gs_body_l/2;    // pocket center in Y
+
+// =====================
+// C) GelSight mounting (M2 threaded in case)
+// =====================
+gs_hole_spacing = 18.0;
+gs_holes_rotate_90 = false;
+gs_screw_clear_d   = 2.2;
+gs_head_cbore_d    = 4.2;
+gs_head_cbore_depth= 2.2;
+gs_hole_center_x_offset = 0.0;
+gs_hole_center_y_offset = 0.0;
+
+// =====================
+// D) Franka fingertip slot
+// =====================
+franka_block_w = 18.0;
+franka_block_l = 18.0;
+franka_block_t = 5.0;
+
+slot_w = franka_block_w + 0.4;
+slot_l = franka_block_l + 0.2;
+slot_h = franka_block_t + 0.1;
+
+slot_y0 = body_l - slot_l;               // start of slot in Y
+slot_z0 = (body_h - slot_h) / 2;         // centered in Z
+
+// =====================
+// E) M4 bolt + nut
+// =====================
+m4_clear_d          = 4.5;
+m4_head_cbore_d     = 7.7;
+m4_head_cbore_depth = 4.3;
+m4_nut_af           = 7.6;
+m4_nut_depth        = 3.6;
+
+clamp_x = 0.0;
+clamp_y = slot_y0 + franka_block_l/2;
+
+// =====================
+// F) Side "Bites"
+// =====================
+bite_len_y   = 16.0;
+bite_depth_z = 7.0;
+bite_cut_w   = 10.0;
+
+
+// Keep the M4 head/tool access clear even with a full-width gusset
+bridge_keepout_enable = true;
+bridge_keepout_d      = m4_head_cbore_d + 6.0;  // tool clearance; tune (e.g. 10..16)
+bridge_keepout_z_top  = 0.5;                    // cut slightly above z=0 for robustness
+
+bridge_ribs = false;   // full-width gusset
+
+
+module step_bridge(){
+  difference() {
+    // --- gusset body ---
+    if (bridge_ribs){
+      // left rib
+      step_bridge_prism(-body_w/2 + bridge_rib_w, bridge_rib_w);
+      // right rib
+      step_bridge_prism(body_w/2, bridge_rib_w);
+    } else {
+      // full-width gusset (strongest)
+      step_bridge_prism(body_w/2, body_w);
+    }
+
+    // --- M4 keepout: prevents gusset material below z=0 around the clamp bolt ---
+    if (bridge_keepout_enable)
+      translate([clamp_x, clamp_y, -drop_z - eps])
+        cylinder(
+          h = drop_z + bridge_keepout_z_top + 2*eps,  // from -drop_z up to ~z=0
+          d = bridge_keepout_d,
+          center = false
+        );
+  }
+}
+
+// ---------- helpers ----------
+module hex_prism_af(af, h){
+  d_vertices = af / cos(30);
+  cylinder(h=h, d=d_vertices, $fn=6);
+}
+
+// Bridge prism: a ramp under the tail down to the lowered front section,
+// implemented by extruding a YZ polygon along X.
+module step_bridge_prism(x_max, w){
+  y0 = split_y - bridge_front_y;
+  y1 = split_y + bridge_back_y;
+
+  // rotate so polygon axes [z,y] become [x?] correctly after extrusion
+  translate([x_max, 0, 0])
+    rotate([0,-90,0])
+      linear_extrude(height=w)
+        polygon(points=[
+          // points are [z, y] because of rotate([0,-90,0])
+          [-drop_z, y0],            // front/bottom
+          [-drop_z, split_y],       // bottom at step
+          [0,       y1],            // ramp meets z=0 deeper into tail
+          [bridge_attach_z, y1],    // tab up into tail
+          [bridge_attach_z, split_y],
+          [0,       split_y],
+          [0,       y0]
+        ]);
+}
+
+
+module base_block_stepped(){
+  union() {
+      // 1. Front Block (The lowered "Window" part)
+      translate([-body_w/2, 0, -drop_z])
+        cube([body_w, split_y, body_h], center=false);
+
+      // 2. Back Block (The original "Tail" part)
+      translate([-body_w/2, split_y, 0])
+        cube([body_w, body_l - split_y, body_h], center=false);
+
+      // 3. NEW: Bridge / gusset
+      if (bridge_enable)
+        step_bridge();
+  }
+}
+
+// ---------- model ----------
+difference(){
+  base_block_stepped();
+
+  // ==========================================
+  // GROUP 1: FRONT CUTS (Shifted down by drop_z)
+  // ==========================================
+  translate([0, 0, -drop_z]) {
+
+      // --- GelSight pocket ---
+      translate([-gs_body_w/2, gs_front_margin, gs_floor_z])
+        cube([gs_body_w, gs_body_l, gs_embed_depth + eps*10], center=false);
+
+      // Relief
+      translate([-gs_body_w/2, gs_front_margin, body_h - gs_relief_depth])
+        cube([gs_body_w, gs_relief_l, gs_relief_depth + eps*10], center=false);
+
+      // --- GelSight M2 mounting holes ---
+      for (s = [-1, 1]) {
+        xh = (gs_holes_rotate_90 ? (s * gs_hole_spacing/2) : 0) + gs_hole_center_x_offset;
+        yh = (gs_holes_rotate_90 ? 0 : (s * gs_hole_spacing/2)) + (gs_center_y + gs_hole_center_y_offset);
+
+        // clearance hole (extended length to ensure it cuts through bottom)
+        translate([xh, yh, -eps - 10])
+          cylinder(h=gs_floor_z + 10 + 2*eps, d=gs_screw_clear_d, center=false);
+
+        // counterbore (bottom side)
+        translate([xh, yh, -eps])
+          cylinder(h=gs_head_cbore_depth + eps, d=gs_head_cbore_d, center=false);
+      }
+
+      // --- Rectangular Bites (These belong to the front section) ---
+      // 1. Right Wall Bite
+      translate([body_w/2 - bite_cut_w/2, (gs_front_margin + gs_body_l) - bite_len_y, body_h - bite_depth_z])
+        cube([bite_cut_w, bite_len_y + eps, bite_depth_z + eps*5]);
+
+      // 2. Left Wall Bite
+      translate([-body_w/2 - bite_cut_w/2, gs_front_margin - eps, body_h - bite_depth_z])
+        cube([bite_cut_w, bite_len_y + eps, bite_depth_z + eps*5]);
+  }
+
+  // ==========================================
+  // GROUP 2: BACK CUTS (No Shift - Keep original Z)
+  // ==========================================
+
+  // --- Franka fingertip slot ---
+  translate([-slot_w/2, slot_y0, slot_z0])
+    cube([slot_w, slot_l + eps, slot_h], center=false);
+
+  // --- M4 through hole + head cbore + nut trap ---
+  // Through hole (extended downward so bridge cannot block it)
+  translate([clamp_x, clamp_y, -drop_z - eps])
+    cylinder(h=body_h + drop_z + 2*eps, d=m4_clear_d, center=false);
+
+  // Bottom head counterbore
+  translate([clamp_x, clamp_y, -eps])
+    cylinder(h=m4_head_cbore_depth + eps, d=m4_head_cbore_d, center=false);
+
+  // Top nut pocket
+  translate([clamp_x, clamp_y, body_h - m4_nut_depth])
+    hex_prism_af(m4_nut_af, m4_nut_depth + eps);
+}

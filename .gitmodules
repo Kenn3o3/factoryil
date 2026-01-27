@@ -4,3 +4,6 @@
 [submodule "src/third_party/gsrobotics"]
 	path = src/third_party/gsrobotics
 	url = https://github.com/gelsightinc/gsrobotics.git
+[submodule "src/franka/vr_teleop/reactive_diffusion_policy"]
+	path = src/franka/vr_teleop/reactive_diffusion_policy
+	url = https://github.com/xiaoxiaoxh/reactive_diffusion_policy.git
